@@ -10,6 +10,10 @@ void Optimization::GetFilmDesign(FilmDesign2* design)
 {
     this->Design1 = design;
 }
+vector<double> Optimization::FilmDesignInitPara()
+{
+    return this->Design1->InitiateParameter();
+}
 
 void Optimization::Initiate(const vector<double> input1, const vector<double> output1, const vector<double> params1)
 {

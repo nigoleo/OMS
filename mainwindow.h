@@ -5,7 +5,7 @@
 #include <QDebug>
 
 #include <vector>
-#include <filmdesign.h>
+
 #include <QFileDialog>
 #include <QStandardItemModel>
 #include <Optimization.h>
@@ -33,10 +33,7 @@ QT_END_NAMESPACE
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
-public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
+private:
 
     QStandardItemModel *model;
     static OptiConsole *console;
@@ -47,8 +44,6 @@ public:
     static unsigned int nLayer;
     static vector<double> omsDataTime;  //去除前10%个数据
     static vector<double> omsDataT;    //去除前10%个数据
-
-
 
     vector<double> omsTotalTime;        //完整的time数据，用于画图
     vector<double> omsTotalT;            //完整的T数据，用于画图
@@ -79,6 +74,8 @@ public:
     double TargetCrystal = 0;
     double TargetTime = 0;
 
+private slots:
+//    void SimulateProcess();                  //模拟监控过程(用于Thread,后面没用了)
 public:
     //获取CPUID等信息
     QString GetCPUID();
@@ -88,10 +85,10 @@ public:
     bool JudgeTime();    //判断时间
     bool JudgeMacAndCPUid();
 
-private slots:
-//    void SimulateProcess();                  //模拟监控过程(用于Thread,后面没用了)
-
 public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
     void Initiate();            //初始化画图选项
 
     void FittingFunc(unsigned int curLayer,vector<double> omsDataTime,vector<double> omsDataT);         //模拟数据
@@ -133,7 +130,6 @@ private slots:
     void ClearStopTime();                                            //清空倒计时的显示
     void ClearFittingInfo();                                         //清空FittingInfo信息
 
-
     //保存&读取数据
     void saveLogData(QString strInfo);          //总的Log过程信息
     void saveOMSData(unsigned int coatLayer,QString strInfo);          //OMS的测试数据
@@ -148,7 +144,6 @@ public:
 public:
     static bool isStarted;
     static bool isFitting;
-
 
     //模拟数据分析相关内容
 

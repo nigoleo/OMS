@@ -10,7 +10,38 @@ FilmDesign2::FilmDesign2()
     _curQW_Orignal = 0;
 
 }
-bool FilmDesign2::GetFileInfo(string filePath)
+void FilmDesign2::CopyFunc(FilmDesign2* filmDesign2)
+{
+    this->designName = filmDesign2->designName;
+    this->isNoNull = filmDesign2->isNoNull;
+    this->HName = filmDesign2->HName;
+    this->LName = filmDesign2->LName;
+    this->HN = filmDesign2->HN;
+    this->LN = filmDesign2->LN;
+    this->HRate = filmDesign2->HRate;
+    this->LRate = filmDesign2->LRate;
+    this->HN_Original = filmDesign2->HN_Original;
+    this->LN_Original = filmDesign2->LN_Original;
+
+    this->indexT = filmDesign2->indexT;
+    this->subStrateName = filmDesign2->subStrateName;
+    this->subStrateN = filmDesign2->subStrateN;
+    this->totalLayer = filmDesign2->totalLayer;
+
+    this->curLayer = filmDesign2->curLayer;
+    this->OMSWL = filmDesign2->OMSWL;
+    this->preTotalMatrix = filmDesign2->preTotalMatrix;
+    this->preNoOptiMatrix = filmDesign2->preNoOptiMatrix;
+    this->checkParams = filmDesign2->checkParams;
+
+    this->_curQW = filmDesign2->_curQW;
+    this->isBackSideNull = filmDesign2->isBackSideNull;
+    this->layerMat = filmDesign2->layerMat;
+    this->layerQW = filmDesign2->layerQW;
+    this->layerControlType = filmDesign2->layerControlType;
+}
+
+bool FilmDesign2::GetFileInfo(const string &filePath)
 {
     bool bRet = false;
     try
@@ -36,7 +67,7 @@ bool FilmDesign2::GetFileInfo(string filePath)
     return bRet;
 }
 
-bool FilmDesign2::GetFileInfo1(string filePath)
+bool FilmDesign2::GetFileInfo1(const string &filePath)
 {
     bool bRet = false;
     try
@@ -107,7 +138,7 @@ bool FilmDesign2::GetFileInfo1(string filePath)
 }
 
 
-bool FilmDesign2::GetFileInfo2(string filePath)
+bool FilmDesign2::GetFileInfo2(const string &filePath)
 {
     bool bRet = false;
     try
@@ -177,7 +208,7 @@ bool FilmDesign2::GetFileInfo2(string filePath)
     return bRet;
 }
 
-void FilmDesign2::TransRefQWtoMonitorQW(unsigned int layerItem)
+void FilmDesign2::TransRefQWtoMonitorQW(const unsigned int &layerItem)
 {
     if(OMSWL == layerMonitorWL[layerItem-1])
     {
@@ -249,20 +280,20 @@ vector<double> FilmDesign2::InitiateParameter()
         checkParams.push_back(LRate);
     }
 
-    checkParams.push_back(preTotalMatrix.matrix11);
-    checkParams.push_back(preTotalMatrix.matrix12);
-    checkParams.push_back(preTotalMatrix.matrix21);
-    checkParams.push_back(preTotalMatrix.matrix22);
+    checkParams.push_back(preTotalMatrix.GetM11());
+    checkParams.push_back(preTotalMatrix.GetM12());
+    checkParams.push_back(preTotalMatrix.GetM21());
+    checkParams.push_back(preTotalMatrix.GetM22());
 //    checkParams.push_back(_curQW);
     return checkParams;
 }
-vector<double> FilmDesign2::GetParamter(vector<double> parameters)
+vector<double> FilmDesign2::GetParamter(const vector<double> &parameters)
 {
     vector<double>().swap(checkParams);
     checkParams = parameters;
     return checkParams;
 }
-void FilmDesign2::ChangeParasToLayerInfo(vector<double> parameters)
+void FilmDesign2::ChangeParasToLayerInfo(const vector<double> &parameters)
 {
      subStrateN = parameters[0];
 //        HN = parameter[1];
@@ -277,11 +308,8 @@ void FilmDesign2::ChangeParasToLayerInfo(vector<double> parameters)
          LN = parameters[1];
          LRate = parameters[2];
      }
+    preTotalMatrix.Initiate(parameters[3],parameters[4],parameters[5],parameters[6]);
 
-     preTotalMatrix.matrix11 = parameters[3];
-     preTotalMatrix.matrix12 = parameters[4];
-     preTotalMatrix.matrix21 = parameters[5];
-     preTotalMatrix.matrix22 = parameters[6];
      //     _curQW = parameters[3];
 }
 
@@ -346,35 +374,38 @@ double FilmDesign2::GetPenatly()
 }
 
 //根据parameters和时间t所对应的透过率,用于模拟优化的,在这基础上加上折射率的惩罚函数
-double FilmDesign2::ComputeT1(double t, vector<double> parameters)
+double FilmDesign2::ComputeT1(const double &t, const vector<double> &parameters)
 {
     ChangeParasToLayerInfo(parameters);
     return ComputeCurLight(t);
 }
 //计算对应膜层的Matrix
-CoatMatrix FilmDesign2::ComputeLayerMat(unsigned int layerItem)
+CoatMatrix FilmDesign2::ComputeLayerMat(const unsigned int &layerItem)
 {
     CoatMatrix tempCoatMatrix;
     if (layerItem <= 0)
     {
-        tempCoatMatrix.matrix11 = 1;
-        tempCoatMatrix.matrix12 = 0;
-        tempCoatMatrix.matrix21 = 0;
-        tempCoatMatrix.matrix22 = 1;
+        tempCoatMatrix.Initiate();
     }
     else
     {
         double n = GetLayerN(layerItem);
         double angle = PI / 2 * GetLayerQW(layerItem);
-        tempCoatMatrix.matrix11 = cos(angle);
-        tempCoatMatrix.matrix12 = sin(angle) / n;
-        tempCoatMatrix.matrix21 = sin(angle) * n;
-        tempCoatMatrix.matrix22 = cos(angle);
+        tempCoatMatrix.Initiate(cos(angle),sin(angle) / n,sin(angle) * n,cos(angle));
     }
     return tempCoatMatrix;
 }
+
+string FilmDesign2::GetLayerMaterial(const unsigned int &layerItem)
+{
+    return layerMat[layerItem -1];
+}
+double FilmDesign2::GetLayerMonitorWL(const unsigned int &layerItem)
+{
+    return layerMonitorWL[layerItem-1];
+}
 //获取对应膜层的折射率
-double FilmDesign2::GetLayerN(unsigned int layerItem)
+double FilmDesign2::GetLayerN(const unsigned int &layerItem)
 {
     if (layerMat[layerItem - 1] == HName)
     {
@@ -386,7 +417,7 @@ double FilmDesign2::GetLayerN(unsigned int layerItem)
     }
 }
 //获取对应膜层在RefWL时的折射率
-double FilmDesign2::GetLayerRefWLN(unsigned int layerItem)
+double FilmDesign2::GetLayerRefWLN(const unsigned int &layerItem)
 {
     if (layerMat[layerItem - 1] == HName)
     {
@@ -397,15 +428,18 @@ double FilmDesign2::GetLayerRefWLN(unsigned int layerItem)
         return LN_Original;
     }
 }
-
+double FilmDesign2::GetLayerQW_RefWL(const unsigned int &layerItem)
+{
+    return layerQW_RefWL[layerItem - 1];
+}
 
 //获取对应膜层的光学厚度
-double FilmDesign2::GetLayerQW(unsigned int layerItem)
+double FilmDesign2::GetLayerQW(const unsigned int &layerItem)
 {
     return layerQW[layerItem - 1];
 }
 //获取对应膜层的速率
-double FilmDesign2::GetLayerRate(unsigned int layerItem)
+double FilmDesign2::GetLayerRate(const unsigned int &layerItem)
 {
     if (layerMat[layerItem - 1] == HName)
      {
@@ -418,7 +452,7 @@ double FilmDesign2::GetLayerRate(unsigned int layerItem)
 }
 
 //获取对应膜层的控制方式
-string FilmDesign2::GetLayerControlType(unsigned int layerItem)
+string FilmDesign2::GetLayerControlType(const unsigned int &layerItem)
 {
     return layerControlType[layerItem-1];
 }
@@ -464,7 +498,7 @@ CoatMatrix FilmDesign2::ComputePreCurLayerMat()
     return preTotalMatrix;
 }
 //计算正在镀膜的膜层在时间t的Matrix
-CoatMatrix FilmDesign2::GetCurLayerMatrix(double t)
+CoatMatrix FilmDesign2::GetCurLayerMatrix(const double &t)
 {
     //获取单前层的折射率
     CoatMatrix tempCoatMatrix;
@@ -472,14 +506,11 @@ CoatMatrix FilmDesign2::GetCurLayerMatrix(double t)
     double rate = GetLayerRate(curLayer);
     //获取单前层的速率
     double angle = PI / 2 * (_curQW + rate*t*n / 2.5/ OMSWL);
-    tempCoatMatrix.matrix11 = cos(angle);
-    tempCoatMatrix.matrix12 = sin(angle) / n;
-    tempCoatMatrix.matrix21 = sin(angle) * n;
-    tempCoatMatrix.matrix22 = cos(angle);
+    tempCoatMatrix.Initiate(cos(angle),sin(angle) / n,sin(angle) * n,cos(angle));
     return tempCoatMatrix;
 }
 //计算时间点t的透过率
-double FilmDesign2::ComputeCurLight(double t)
+double FilmDesign2::ComputeCurLight(const double &t)
 {
     CoatMatrix totalMatrix = GetCurLayerMatrix(t)* preTotalMatrix;
     return ComputeMatrixLight(totalMatrix);
@@ -489,26 +520,23 @@ double FilmDesign2::ComputeMatrixLight(CoatMatrix totalMatrix)
 {
     if (!isBackSideNull)   //需要考虑背面
     {
-        double T1 = 4 * subStrateN / (pow((totalMatrix.matrix11 + totalMatrix.matrix22 * subStrateN), 2) + pow((totalMatrix.matrix12 * subStrateN + totalMatrix.matrix21), 2));
+        double T1 = 4 * subStrateN / (pow((totalMatrix.GetM11() + totalMatrix.GetM22() * subStrateN), 2) + pow((totalMatrix.GetM12() * subStrateN + totalMatrix.GetM21()), 2));
         double T2 = (1 - pow(((subStrateN - 1) / (subStrateN + 1)), 2));
         return indexT*100 * (T2 * T1/(1-(1-T1)*(1-T2)));
     }
     else
     {
-        return indexT * 100 * 4 * subStrateN / (pow((totalMatrix.matrix11 + totalMatrix.matrix22 * subStrateN), 2) + pow((totalMatrix.matrix12 * subStrateN + totalMatrix.matrix21), 2));
+        return indexT * 100 * 4 * subStrateN / (pow((totalMatrix.GetM11() + totalMatrix.GetM22() * subStrateN), 2) + pow((totalMatrix.GetM12() * subStrateN + totalMatrix.GetM21()), 2));
     }
 }
 //计算thkQW对应的透过率
-double FilmDesign2::GetCurThkLightVal(double thkQW)
+double FilmDesign2::GetCurThkLightVal(const double &thkQW)
 {
     CoatMatrix tempCoatMatrix;
     double n = GetLayerN(curLayer);
     //获取单前层的速率
     double angle = PI /2 * (thkQW); //thkQW包含了_curQW
-    tempCoatMatrix.matrix11 = cos(angle);
-    tempCoatMatrix.matrix12 = sin(angle) / n;
-    tempCoatMatrix.matrix21 = sin(angle) * n;
-    tempCoatMatrix.matrix22 = cos(angle);
+    tempCoatMatrix.Initiate(cos(angle),sin(angle) / n,sin(angle) * n,cos(angle));
     /*if (preTotalMatrix.isNull())
     {
         ComputePreCurLayerMat();
@@ -517,34 +545,30 @@ double FilmDesign2::GetCurThkLightVal(double thkQW)
     return ComputeMatrixLight(totalMatrix);
 }
 //计算thkQW对应的相位
-double FilmDesign2::GetCurThkPhaseVal(double thkQW)
+double FilmDesign2::GetCurThkPhaseVal(const double &thkQW)
 {
     CoatMatrix tempCoatMatrix ;
     double n = GetLayerN(curLayer);
     //获取单前层的速率
     double angle = PI / 2 * (thkQW);   //thkQW包含了_curQW
-    tempCoatMatrix.matrix11 = cos(angle);
-    tempCoatMatrix.matrix12 = sin(angle) / n;
-    tempCoatMatrix.matrix21 = sin(angle) * n;
-    tempCoatMatrix.matrix22 = cos(angle);
+    tempCoatMatrix.Initiate(cos(angle),sin(angle) / n,sin(angle) * n,cos(angle));
     //if(preTotalMatrix == null)
     //{
     //    ComputePreCurLayerMat();
     //}
     CoatMatrix totalMatrix = tempCoatMatrix* preTotalMatrix;
+
     CoatMatrix subStrate;
-    subStrate.matrix11 = 1;
-    subStrate.matrix12 = 0;
-    subStrate.matrix21 = 0;
-    subStrate.matrix22 = subStrateN;
+
+    subStrate.Initiate(1,0,0,subStrateN);
     totalMatrix = totalMatrix* subStrate;
 
     double DR, DI, EI, ER, DDx_minus_EEx, dblDesignWLPhase;
 
-    DR = totalMatrix.matrix11;
-    DI = totalMatrix.matrix12;
-    EI = totalMatrix.matrix21;
-    ER = totalMatrix.matrix22;
+    DR = totalMatrix.GetM11();
+    DI = totalMatrix.GetM12();
+    EI = totalMatrix.GetM21();
+    ER = totalMatrix.GetM22();
 
     DDx_minus_EEx = DR * DR + DI * DI - ER * ER - EI * EI;
 //    dblDesignWLPhase = (2 * DI * ER - 2 * DR * EI) / DDx_minus_EEx;
@@ -568,10 +592,10 @@ double FilmDesign2::GetNextPeakQW()
     double aa,bb,cc,dd;
     double a,b,c;
     double nk = GetLayerN(curLayer);
-    DR = preTotalMatrix.matrix11;
-    DI = preTotalMatrix.matrix12;
-    EI = preTotalMatrix.matrix21;
-    ER = preTotalMatrix.matrix22;
+    DR = preTotalMatrix.GetM11();
+    DI = preTotalMatrix.GetM12();
+    EI = preTotalMatrix.GetM21();
+    ER = preTotalMatrix.GetM22();
 
     aa = DR + ER * subStrateN ;
     bb = (-1) * (EI / nk + DI * nk * subStrateN);
@@ -671,7 +695,7 @@ void FilmDesign2::GetInfoVal(double& CutPeakQW,int& nCutPeak,double& Tmax,double
     }
 }
 
-void FilmDesign2::GetMaxMinValue(double d1,double d2,double d3,double d4,double& dMax,double& dMin)
+void FilmDesign2::GetMaxMinValue(const double &d1,const double &d2,const double &d3,const double &d4,double& dMax,double& dMin)
 {
     dMax = d1;
     dMin = d1;
@@ -702,7 +726,7 @@ void FilmDesign2::GetMaxMinValue(double d1,double d2,double d3,double d4,double&
     }
 }
 
-void FilmDesign2::GetMaxMinValue(double d1,double d2,double d3,double& dMax,double& dMin)
+void FilmDesign2::GetMaxMinValue(const double &d1,const double &d2,const double &d3,double& dMax,double& dMin)
 {
     dMax = d1;
     dMin = d1;
@@ -761,7 +785,7 @@ bool FilmDesign2::isOutTol()
     return false;
 }
 
-double FilmDesign2::GetSubstrateN(string substrateFileName)
+double FilmDesign2::GetSubstrateN(const string &substrateFileName)
 {
     try
     {
@@ -815,7 +839,7 @@ double FilmDesign2::GetSubstrateN(string substrateFileName)
     }
     return 1.52629204;
 }
-double FilmDesign2::GetLayerN(string layerFileName,double WL)
+double FilmDesign2::GetLayerN(const string &layerFileName,const double &WL)
 {
     try
     {
@@ -868,4 +892,62 @@ double FilmDesign2::GetLayerN(string layerFileName,double WL)
         return 1.0;
     }
     return 1.0;
+}
+
+
+unsigned int FilmDesign2::GetCurLayer()
+{
+    return this->curLayer;
+}
+string FilmDesign2::GetDesignName()
+{
+    return this->designName;
+}
+double FilmDesign2::GetHN()
+{
+    return this->HN;
+}
+double FilmDesign2::GetLN()
+{
+    return this->LN;
+}
+string FilmDesign2::GetHName()
+{
+    return this->HName;
+}
+string FilmDesign2::GetLName()
+{
+    return this->LName;
+}
+double FilmDesign2::GetHRate()
+{
+    return this->HRate;
+}
+double FilmDesign2::GetLRate()
+{
+    return this->LRate;
+}
+bool FilmDesign2::GetIsNotNull()
+{
+    return this->isNoNull;
+}
+double FilmDesign2::GetOMSWL()
+{
+    return this->OMSWL;
+}
+double FilmDesign2::GetRefWL()
+{
+    return this->refWL;
+}
+int FilmDesign2::GetTotalLayer()
+{
+    return this->totalLayer;
+}
+double FilmDesign2::Get_curQW()
+{
+    return this->_curQW;
+}
+void FilmDesign2::SetCurLayer(const int &nVal)
+{
+    this->curLayer = nVal;
 }

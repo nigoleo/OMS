@@ -24,8 +24,6 @@ INCLUDEPATH += D:\ZWGD\Software\OMS_CPP\Eigen
 SOURCES += \
     Optimization.cpp \
     coatmatrix.cpp \
-    filmdesign.cpp \
-    filmdesign1.cpp \
     filmdesign2.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -34,8 +32,6 @@ SOURCES += \
 HEADERS += \
     Optimization.h \
     coatmatrix.h \
-    filmdesign.h \
-    filmdesign1.h \
     filmdesign2.h \
     mainwindow.h \
     opticonsole.h

@@ -12,7 +12,7 @@ double MainWindow::dPreCrystal = 0;
 double MainWindow::dPreTime = 0;
 
 double MainWindow::lastTime = 0;             //用于层保存数据
-double MainWindow::lastCrystal = 0;              //用于层保存数据
+double MainWindow::lastCrystal = 0;          //用于层保存数据
 vector<double> MainWindow::simuTime;     //用于层保存数据
 vector<double> MainWindow::simuT;        //用于层保存数据
 
@@ -22,7 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setWindowTitle("OMS_Test_Rev1.0");
+    setWindowTitle("OMS_Test_Rev1.1");
 
     //考虑添加获取北京时间功能选项_用于授权功能
 
@@ -136,7 +136,6 @@ QString MainWindow::GetDiskDriveSerial()
     return serial;
 //AA000000000000000774
 }
-
 QString MainWindow::GetMac()
 {
     QStringList mac_list;
@@ -159,8 +158,6 @@ QString MainWindow::GetMac()
     return strMac;
     //60:14:B3:CB:75:5D
 }
-
-
 bool MainWindow::JudgeMacAndCPUid()
 {
     QString cpu_id = "BFEBFBFF000406E3";            //本机的cpuID
@@ -176,12 +173,12 @@ bool MainWindow::JudgeMacAndCPUid()
     }
 }
 
+//Chart曲线的初始化
 void MainWindow::Initiate()
 {
 
     m_chart= new QChart();
     omsData= new QLineSeries();
-
     simuData= new QLineSeries();
 
     m_chart->addSeries(omsData);
@@ -204,32 +201,20 @@ void MainWindow::on_BtnConnect_clicked()
 {
     if(ui->BtnConnect->text() == tr("connect"))
     {
-        QString IP;
-        quint16 port;
-        //获取IP地址
-        IP = ui->lE_IP->text();
-        port = ui->lE_Port->text().toUShort();
+        QString IP = ui->lE_IP->text();             //获取IP地址
+        quint16 port = ui->lE_Port->text().toUShort();
+        socket->abort();            //取消已有连接
+        socket->connectToHost(IP,port);     //连接服务器
 
-        //取消已有连接
-        socket->abort();
-        //连接服务器
-        socket->connectToHost(IP,port);
-        //等待连接成功
-        if(!socket->waitForConnected(3000))
-        {
-            //qDebug()<<"Connect Failed";
+        if(!socket->waitForConnected(3000))     //等待连接成功        //qDebug()<<"Connect Failed";
             return;
-        }
         //qDebug()<<"Connect successfully!";
-        //发送按钮使能
-        ui->BtnConnect->setText("DisConnect");
+        ui->BtnConnect->setText("DisConnect");      //发送按钮使能
     }
     else
-    {
-        //断开连接
-        socket->disconnectFromHost();
-        //修改按钮文字
-        ui->BtnConnect->setText("connect");
+    {        
+        socket->disconnectFromHost();       //断开连接
+        ui->BtnConnect->setText("connect");     //修改按钮文字
     }
 }
 //读取信号,进行数据处理和模拟信号
@@ -245,14 +230,12 @@ void MainWindow::socket_ReadData()
             QString str;
             str = tr(buffer);
             QStringList strList = str.split(",");
-            SolutionData(strList);
+            SolutionData(strList);                                      //数据处理
 
-            if(isFitting&&(console->TheoryDesign->GetLayerControlType(console->TheoryDesign->curLayer)!="T"))
+            if(isFitting&&(!console->isEqualControlTypeForCurLayer("T")))      //当前层不为T控制方式以及开启Fitting
             {
-                FittingFunc(nLayer,omsDataTime,omsDataT);
-
-                //如果模拟参数超出一定范围时，重新设定模拟设定值
-                if (console->SimulateDesign->isOutTol())
+                FittingFunc(nLayer,omsDataTime,omsDataT);                
+                if (console->GetSimulateDesignIsOutTol())        //如果模拟参数超出一定范围时，重新设定模拟设定值
                 {
                     console->LoadTheoryDesignToSimualte();
                 }
@@ -264,8 +247,7 @@ void MainWindow::socket_ReadData()
 //断开连接
 void MainWindow::socket_Disconnected()
 {
-    //发送按钮失能
-    ui->BtnConnect->setText("connect");
+    ui->BtnConnect->setText("connect");     //发送按钮失能
     //qDebug()<<"Disconnected";
 }
 
@@ -278,7 +260,7 @@ void MainWindow::on_BtnStart_clicked()
         QMessageBox::warning(this,"warning","Please set the lot number.");
         return;
     }
-    if (!console->TheoryDesign->isNoNull)
+    if (!console->GetTheoryDesignIsNoNull())
     {
         QMessageBox::warning(this,"warning","Please check the Deisgn is loaded in.");
         return;
@@ -293,9 +275,9 @@ void MainWindow::on_BtnStart_clicked()
         ui->BtnStart->setPalette(pallete);
         ui->Btn_Stop->setEnabled(true);
         saveLogData("Start Coating!");
-        console->TheoryDesign->curLayer = 0;
-        console->TheoryDesign->ClearPreMat();
-        console->LoadTheoryDesignToSimualte();
+
+        console->InitiateSimulateDesign();   //初始化SimulateDesign
+
         //需要刷新下历史数据（如果模拟数据过）
         vector<double>().swap(omsDataTime);
         vector<double>().swap(omsDataT);
@@ -348,13 +330,7 @@ void MainWindow::FittingFunc(unsigned int curLayer,vector<double> omsDataTime,ve
         QTime time;
         time.start();
         console->LoadOMSData(omsDataTime,omsDataT);
-        //如果导入的层与理论设定层不一致，需要重新刷新PreMat
-        if(curLayer != console->SimulateDesign->curLayer)
-        {
-            console->TheoryDesign->curLayer = curLayer;
-            console->TheoryDesign->ClearPreMat();
-            console->LoadTheoryDesignToSimualte();
-        }
+        console->FreshSimulateDesign(curLayer);     //如果导入的层为新的层数,刷新SimualteDesign
         console->Fitting();  
         ShowSimulateInfo(omsDataTime);          //显示相关的模拟信息
 
@@ -428,11 +404,11 @@ void MainWindow::ShowSimulateInfo(vector<double> omsDataTime)
 
     //返回选定方式的倒计时***先不考虑
     double DeltaTime = 9999;
-    if (console->TheoryDesign->GetLayerControlType(console->TheoryDesign->curLayer)=="O")
+    if (console->isEqualControlTypeForCurLayer("O"))
     {
         DeltaTime = Time_Offset - omsDataTime[omsDataTime.size()-1];
     }
-    else if (console->TheoryDesign->GetLayerControlType(console->TheoryDesign->curLayer)=="S")
+    else if (console->isEqualControlTypeForCurLayer("S"))
     {
         DeltaTime = Time_Phase - omsDataTime[omsDataTime.size()-1];
     }
@@ -443,7 +419,7 @@ void MainWindow::ShowSimulateInfo(vector<double> omsDataTime)
     if (DeltaTime<10)
     {
         ShowStopTime(DeltaTime,"OMS");
-        saveLogData(QString("Layer_%1 will be stoped at %2").arg(console->TheoryDesign->curLayer).arg(DeltaTime));
+        saveLogData(QString("Layer_%1 will be stoped at %2").arg(console->GetTheoryDesignCurLayer()).arg(DeltaTime));
     }
     if(DeltaTime<5)
     {
@@ -512,10 +488,10 @@ void MainWindow::on_BtnLoadDesign_clicked()
                                                     "open",
                                                     "../",
                                                     "RCP(*.rcp)");
-    console->TheoryDesign->GetFileInfo(filePath.toStdString());
+    console->LoadTheoryDesign(filePath.toStdString());
     ShowDesignInfo();
-    ui->label->setText(QString("Name:%1").arg(QString::fromStdString(console->TheoryDesign->designName)));
-    ui->label_3->setText(QString("Layer:%1").arg(QString::number(console->TheoryDesign->totalLayer)));
+    ui->label->setText(QString("Name:%1").arg(QString::fromStdString(console->GetTheoryDesignDesignName())));
+    ui->label_3->setText(QString("Layer:%1").arg(QString::number(console->GetTheoryDesignTotalLayer())));
 }
 
 void MainWindow::on_Btn_SetLot_clicked()
@@ -561,18 +537,19 @@ void MainWindow::ShowDesignInfo()
     ui->tV_Design->setColumnWidth(6,40);
     ui->tV_Design->verticalHeader()->hide();
 
-    for (int i = 0 ;i<console->TheoryDesign->totalLayer;i++)
+    for (int i = 0 ;i<console->GetTheoryDesignTotalLayer();++i)
     {
         model->insertRow(i);
         model->setItem(i,0,new QStandardItem(QString::number(i+1)));
-        model->setItem(i,1,new QStandardItem(QString::fromStdString(console->TheoryDesign->layerMat[i])));
-        model->setItem(i,2,new QStandardItem(QString::number(console->TheoryDesign->layerQW_RefWL[i])));
-        model->setItem(i,3,new QStandardItem(QString::number(console->TheoryDesign->refWL)));
-        model->setItem(i,4,new QStandardItem(QString::number(console->TheoryDesign->layerQW[i])));
-        model->setItem(i,5,new QStandardItem(QString::number(console->TheoryDesign->layerMonitorWL[i])));
-        model->setItem(i,6,new QStandardItem(QString::fromStdString(console->TheoryDesign->layerControlType[i])));
+        model->setItem(i,1,new QStandardItem(QString::fromStdString(console->GetTheoryDesignLayerMaterial(i+1))));
+        model->setItem(i,2,new QStandardItem(QString::number(console->GetTheoryDesignLayerQW_RefWL(i+1))));
+        model->setItem(i,3,new QStandardItem(QString::number(console->GetTheoryDesignRefWL())));
+        model->setItem(i,4,new QStandardItem(QString::number(console->GetTheoryDesignLayerQW(i+1))));
+        model->setItem(i,5,new QStandardItem(QString::number(console->GetTheoryDesignLayerMonitorWL(i+1))));
+        model->setItem(i,6,new QStandardItem(QString::fromStdString(console->GetTheoryDesignLayerControlType(i+1))));
 
-        if ((i+1) < console->TheoryDesign->curLayer)
+
+        if ((i+1) < console->GetTheoryDesignCurLayer())
         {
             model->item(i,0)->setBackground(QBrush(Qt::green));
             model->item(i,1)->setBackground(QBrush(Qt::green));
@@ -582,7 +559,7 @@ void MainWindow::ShowDesignInfo()
             model->item(i,5)->setBackground(QBrush(Qt::green));
             model->item(i,6)->setBackground(QBrush(Qt::green));
         }
-        else if ((i+1) == console->TheoryDesign->curLayer)
+        else if ((i+1) == console->GetTheoryDesignCurLayer())
         {
             model->item(i,0)->setBackground(QBrush(Qt::yellow));
             model->item(i,1)->setBackground(QBrush(Qt::yellow));
@@ -691,7 +668,7 @@ void MainWindow::SolutionData(QStringList strList)
     ui->label_Rate->setText(QString::number(rate,'f',2));
     nLayer = coatLayer;
 
-    if (coatLayer!= console->TheoryDesign->curLayer)   //切换层数时
+    if (coatLayer!= console->GetTheoryDesignCurLayer())   //切换层数时
     {
         TargetCrystal = 0;
         TargetTime = 0;
@@ -699,18 +676,17 @@ void MainWindow::SolutionData(QStringList strList)
         dPreTime = 0;
         dPreCrystal = 0;
 
-
         vector<double>().swap(vecLoadTime);
         vector<double>().swap(vecLoadCrystal);
 
         isFitting = false;
         m_chart->removeSeries(simuData);
 
-        console->TheoryDesign->curLayer = coatLayer;
-        console->TheoryDesign->TransRefQWtoMonitorQW(coatLayer);        //MWL修改为当前层所使用的监控波长
+        console->SetTheoryDesignCurLayer(coatLayer);
+        console->TheoryDesignTransRefQWtoMonitorQW(coatLayer);        //MWL修改为当前层所使用的监控波长
+        console->SetTheoryDesignClearPreMatrix();
         ShowDesignInfo();
 
-        console->TheoryDesign->ClearPreMat();
         vector<double>().swap(omsDataTime);
         vector<double>().swap(omsDataT);
         vector<double>().swap(omsTotalTime) ;
@@ -727,7 +703,6 @@ void MainWindow::SolutionData(QStringList strList)
         isClickedNextLayer = false;                         //是否点击NextLayer
 
         //需要确认下读取是否存在本层OMS；如果已存在OMS数据，又重新开始这一层的镀膜，在这基础上继续添加数据（用于异常处理时出现的情况）????好像有Bug存在，stop再start就会退出
-
         getCurLayerOMSInfo();
     }
     //用于判定输入的数据重新归零，time归零
@@ -780,7 +755,7 @@ void MainWindow::SolutionData(QStringList strList)
     lastCrystal = lastCrystal*100;
 
     //不同控制方式,如果为T的话，根据晶控值达到目标值停止
-    if (console->TheoryDesign->GetLayerControlType(coatLayer)=="T")
+    if (console->GetTheoryDesignLayerControlType(coatLayer)=="T")
     {
         double delta = TargetCrystal- lastCrystal;
         if (delta<10)
@@ -829,10 +804,10 @@ void MainWindow::NextLayer()
 {
     socket_NextLayer();
     saveLogData(QString("Stop Fitting!"));
-    saveLayerInfo(console->TheoryDesign->curLayer,lastCrystal,lastTime);
+    saveLayerInfo(console->GetTheoryDesignCurLayer(),lastCrystal,lastTime);
     if (isFitting&(!isClickedNextLayer))
     {
-        saveSimuData(console->TheoryDesign->curLayer,simuTime,simuT);
+        saveSimuData(console->GetTheoryDesignCurLayer(),simuTime,simuT);
         NextLayerTimer->stop();
         isClickedNextLayer = true;
     }
@@ -866,7 +841,7 @@ void MainWindow::socket_NextLayer()
 
     socket->write(QString("NextLayer").toLatin1());    //ASCII码形式发送
     socket->flush();
-    saveLogData(QString("Layer_%1 End!").arg(console->TheoryDesign->curLayer));
+    saveLogData(QString("Layer_%1 End!").arg(console->GetTheoryDesignCurLayer()));
 }
 
 /*************************End**************************************/
@@ -882,7 +857,7 @@ void MainWindow::saveLogData(QString strInfo)
 
     fileInfo.open( QIODevice::ReadWrite | QIODevice::Text |QIODevice::Append);
     QTextStream txtOutput(&fileInfo);
-    txtOutput<<strInfo<<endl;
+    txtOutput<<strInfo<<"\n";
     fileInfo.close();
 
     QString str = ui->pTE_Process->toPlainText();
@@ -911,7 +886,7 @@ void MainWindow::saveSimuData(unsigned int coatLayer,vector<double>simuTime,vect
     {
         for (unsigned int i = 0 ;i<simuTime.size();i++)
         {
-            txtOutput<<coatLayer<<","<<simuTime[i]<<","<<simuT[i]<<endl;
+            txtOutput<<coatLayer<<","<<simuTime[i]<<","<<simuT[i]<<"\n";
         }
     }
     catch(exception ex)
@@ -928,18 +903,19 @@ void MainWindow::saveLayerInfo(unsigned int coatLayer,double crystal,double time
     fileInfo.open( QIODevice::ReadWrite | QIODevice::Text|QIODevice::Append);
     QTextStream txtOutput(&fileInfo);
 
-    txtOutput<<coatLayer<<","<<crystal<<","<<time<<endl;
+    txtOutput<<coatLayer<<","<<crystal<<","<<time<<"\n";
 
     fileInfo.close();
 }
 
 bool MainWindow::readLayerInfo(double &crystal,double& time)
 {
-    double QW = console->TheoryDesign->GetLayerQW(console->TheoryDesign->curLayer);
-    double N = console->TheoryDesign->GetLayerN(console->TheoryDesign->curLayer);
-    double Rate = console->TheoryDesign->GetLayerRate(console->TheoryDesign->curLayer);
+    unsigned int nCurLayer = console->GetTheoryDesignCurLayer();
+    double QW = console->GetTheoryDesignLayerQW(nCurLayer);
+    double N = console->GetTheoryDesignLayerN(nCurLayer);
+    double Rate = console->GetTheoryDesignLayerRate(nCurLayer);
 
-    crystal = QW/4/N*console->TheoryDesign->OMSWL;               //理论晶控
+    crystal = QW/4/N*console->GetTheoryDesignOMSWL();               //理论晶控
 
     time = crystal/Rate*10;       //理论时间
     ui->label_TargetCrstal->setText(QString::number(crystal,'f',2));
@@ -979,9 +955,9 @@ bool MainWindow::readLayerInfo(double &crystal,double& time)
     for(int i = layerNo.size()-1;i>-1;i--)
     {
         int j = layerNo[i];
-        if (console->TheoryDesign->layerMat[j-1] == console->TheoryDesign->layerMat[console->TheoryDesign->curLayer - 1])
+        if (console->GetTheoryDesignLayerMaterial(j) == console->GetTheoryDesignLayerMaterial(console->GetTheoryDesignCurLayer()))
         {
-            double layerQW = console->TheoryDesign->layerQW[j-1];
+            double layerQW = console->GetTheoryDesignLayerQW(j);
             if (layerQW > 0)
             {
                 indexCrystal += vecCrystal[i]/layerQW;
@@ -996,8 +972,8 @@ bool MainWindow::readLayerInfo(double &crystal,double& time)
     }
     if (nCount != 0)
     {
-        crystal = indexCrystal/(nCount)*console->TheoryDesign->GetLayerQW(console->TheoryDesign->curLayer);
-        time = indexTime/(nCount)*console->TheoryDesign->GetLayerQW(console->TheoryDesign->curLayer);
+        crystal = indexCrystal/(nCount)*console->GetTheoryDesignLayerQW(console->GetTheoryDesignCurLayer());
+        time = indexTime/(nCount)*console->GetTheoryDesignLayerQW(console->GetTheoryDesignCurLayer());
         ui->label_TargetCrstal->setText(QString::number(crystal,'f',2));
         ui->label_TargetTime->setText(QString::number(time,'f',2));
     }
@@ -1006,7 +982,7 @@ bool MainWindow::readLayerInfo(double &crystal,double& time)
 
 void MainWindow::getCurLayerOMSInfo()
 {
-    QString logFileName = FileAddress + "//Layer_" + QString::number(console->TheoryDesign->curLayer) + "_omsData.csv";
+    QString logFileName = FileAddress + "//Layer_" + QString::number(console->GetTheoryDesignCurLayer()) + "_omsData.csv";
     QFile fileInfo(logFileName);
     if(!fileInfo.open(QIODevice::ReadOnly | QIODevice::Text))
     {
@@ -1097,7 +1073,8 @@ QStringList MainWindow::GetLayerInfo(int nCount)
     QFile file(FileName);
     if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        //qDebug()<<"Can't open the file!"<<endl;
+        //qDebug()<<"Can't open the file!"<<"\n";
+        return strlist;
     }
     for(int i = 0; i<nCount;i++)
     {
@@ -1134,7 +1111,15 @@ void MainWindow::Debug()
     QStringList x = GetLayerInfo(nInfoItem);
     QThread::msleep(1);
     SolutionData(x);
-    FittingFunc(ui->lE_FileLayer->text().toUInt(),omsDataTime,omsDataT);
+    if(isFitting&&(!console->isEqualControlTypeForCurLayer("T")))      //当前层不为T控制方式以及开启Fitting
+    {
+        FittingFunc(ui->lE_FileLayer->text().toUInt(),omsDataTime,omsDataT);
+        if (console->GetSimulateDesignIsOutTol())        //如果模拟参数超出一定范围时，重新设定模拟设定值
+        {
+            console->LoadTheoryDesignToSimualte();
+        }
+    }
+//    FittingFunc(ui->lE_FileLayer->text().toUInt(),omsDataTime,omsDataT);
     nInfoItem ++;
     if(nInfoItem == Count)
     {
@@ -1158,9 +1143,9 @@ void MainWindow::on_Btn_Test_clicked()
     readLayerInfo(crystal,time);
     qDebug()<<crystal<<time;
 */
-    qDebug()<<console->TheoryDesign->curLayer;
-    console->TheoryDesign->curLayer += 4;
-    console->TheoryDesign->TransRefQWtoMonitorQW(console->TheoryDesign->curLayer);        //MWL修改为当前层所使用的监控波长
+    qDebug()<<console->GetTheoryDesignCurLayer();
+//    console->TheoryDesign->curLayer += 4;
+//    console->TheoryDesign->TransRefQWtoMonitorQW(console->TheoryDesign->curLayer);        //MWL修改为当前层所使用的监控波长
     ShowDesignInfo();
 
 }

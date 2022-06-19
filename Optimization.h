@@ -19,14 +19,14 @@ public:
     const double M_PI_2 = 1.570796327;
 
     int penaltyIndex = 1;  //惩罚函数的系数
-
+private:
     FilmDesign2* Design1;
-
     VectorXd input;
     VectorXd output;
     VectorXd params;
-
+public:
     Optimization();
+    vector<double> FilmDesignInitPara();
     void GetFilmDesign(FilmDesign2* design);
 
     void Initiate(const vector<double> input1, const vector<double> output1, const vector<double> params1);
