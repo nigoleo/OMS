@@ -10,6 +10,10 @@ void Optimization::GetFilmDesign(FilmDesign2* design)
 {
     this->Design1 = design;
 }
+vector<double> Optimization::FilmDesignInitPara()
+{
+    return this->Design1->InitiateParameter();
+}
 
 void Optimization::Initiate(const vector<double> input1, const vector<double> output1, const vector<double> params1)
 {
@@ -17,17 +21,17 @@ void Optimization::Initiate(const vector<double> input1, const vector<double> ou
     output.resize(output1.size());
     params.resize(params1.size());
 
-    for (int i = 0; i < input.size();i++)
+    for (int i = 0; i < input.size();++i)
 	{
 		input[i] = input1[i];
 	}
 
-	for (int i = 0; i< output.size();i++)
+    for (int i = 0; i< output.size();++i)
 	{
 		output[i] = output1[i];
 	}
 
-    for (int i = 0; i< params1.size();i++)
+    for (vector<double>::size_type i = 0; i< params1.size();++i)
 	{
 		params[i] = params1[i];
 	}
@@ -45,9 +49,8 @@ double Optimization::func(const VectorXd& input, const VectorXd& output, const V
     {
         params.push_back(parameter[i]);
     }
-
-//Design1->ComputeT1(t,params);
-//如果添加惩罚函数是否添加在func上面
+    //Design1->ComputeT1(t,params);
+    //如果添加惩罚函数是否添加在func上面
     return Design1->ComputeT1(t,params) - f ;
 }
 
@@ -60,40 +63,37 @@ VectorXd Optimization::objF(const VectorXd& input, const VectorXd& output,const 
     {
         obj[i] = (func(input, output,parameter,i));
     }
-
     return obj;
 }
 
 double Optimization::Func(const VectorXd& obj)
 {
     return obj.norm()/2 ;   //+ this->Design1->GetPenatly()
-
 }
 
-double Optimization::Deriv(const VectorXd& input, const VectorXd& output, int objIndex, const VectorXd& params,
+double Optimization::Deriv(const VectorXd& input, const VectorXd& output, int objIndex, const VectorXd& parameter,
                       int paraIndex,const VectorXd& obj)
 {
-//可以考虑减少一个obj的计算减少计算量
-//    VectorXd para1 = params;
-    VectorXd para2 = params;
 
-//    para1(paraIndex) -= DERIV_STEP;
+    VectorXd para2 = parameter;
     para2(paraIndex) += DERIV_STEP;
-
- //   double obj1 = func(input, output, para1, objIndex);
     double obj2 = func(input, output, para2, objIndex);
-
-//    return (obj2 - obj1) / (2 * DERIV_STEP);
     return (obj2 - obj[objIndex]) / DERIV_STEP;
-
+/*采用偏导数计算公式计算出来的偏导数
+    double time = input[objIndex];
+    vector<double> params;
+    for (int i = 0; i<parameter.size();i++)
+    {
+        params.push_back(parameter[i]);
+    }
+   return Design1->GetCurThkDeltaParameters(time,params).at(paraIndex);*/
 }
+
 MatrixXd Optimization::Jacobin(const VectorXd& input, const VectorXd& output, const VectorXd& params,const VectorXd& obj)
 {
     int rowNum = input.size();
     int colNum = params.size();
-
     MatrixXd Jac(rowNum, colNum);
-
     for (int i = 0; i < rowNum; i++)
     {
         for (int j = 0; j < colNum; j++)
@@ -130,12 +130,12 @@ void Optimization::gaussNewton()
         MatrixXd Jac = Jacobin(input, output, params,obj);
         VectorXd delta(paraNum);
         delta = (Jac.transpose() * Jac).inverse() * Jac.transpose() * obj;
+/*
+        if (abs(delta(0))>0.1)
+           delta(0) /= 10;
 
-//        if (abs(delta(0))>0.1)
-//            delta(0) /= 10;
-
-//        if (abs(delta(1))>0.1)
-//            delta(1) /= 10;
+        if (abs(delta(1))>0.1)
+            delta(1) /= 10;*/
 
         params -= delta;
         iterCnt++;
@@ -171,7 +171,7 @@ void Optimization::levenMar()
     VectorXd gradient = Jac.transpose() * obj;      //gradient
 
     //initial parameter tao v epsilon1 epsilon2
-    double tao = 1e-3;
+    double tao = 5e-5;
     long long v = 2;
     double eps1 = 1e-12, eps2 = 1e-12;
     double u = tao * maxMatrixDiagonale(A);
@@ -237,8 +237,6 @@ void Optimization::levenMar()
         }
 
         iterCnt++;
-
-        //penaltyIndex *= 2;
     }
 
 }
